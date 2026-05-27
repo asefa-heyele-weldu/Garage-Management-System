@@ -1,31 +1,43 @@
-import { z } from 'zod';
-import { createVehicle, listVehicles } from '../services/garageService.js';
+import { getDashboardSummary } from '../services/garageService.js';
 
-const vehicleSchema = z.object({
-  customerId: z.coerce.number().int().positive(),
-  plateNumber: z.string().min(2),
-  make: z.string().min(1),
-  model: z.string().min(1),
-  year: z.coerce.number().int().optional().nullable(),
-  vin: z.string().optional().nullable(),
-  status: z.string().optional().nullable()
-});
-
-export async function getVehicles(req, res, next) {
+/**
+ * @desc    Get dashboard summary
+ * @route   GET /api/dashboard
+ * @access  Private (can be restricted by role)
+ */
+export async function getDashboard(req, res, next) {
   try {
-    const vehicles = await listVehicles();
-    res.json(vehicles);
-  } catch (error) {
-    next(error);
-  }
-}
+    // Optional: Extract user info (if authentication exists)
+    const user = req.user || null;
 
-export async function addVehicle(req, res, next) {
-  try {
-    const payload = vehicleSchema.parse(req.body);
-    const id = await createVehicle(payload);
-    res.status(201).json({ id, message: 'Vehicle created successfully' });
+    // Optional: Query params (for filtering, date range, etc.)
+    const { startDate, endDate } = req.query;
+
+    // Call service with filters
+    const dashboard = await getDashboardSummary({
+      startDate,
+      endDate,
+      userId: user?.id,
+    });
+
+    // Add metadata
+    const response = {
+      success: true,
+      message: "Dashboard data fetched successfully",
+      timestamp: new Date().toISOString(),
+      data: dashboard,
+    };
+
+    res.status(200).json(response);
+
   } catch (error) {
-    next(error);
+    // Add custom error logging
+    console.error("Dashboard Error:", {
+      message: error.message,
+      stack: error.stack,
+      user: req.user?.id || "guest",
+    });
+
+    next(error); // Pass to global error handler
   }
 }
